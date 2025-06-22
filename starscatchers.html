@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Star Catcher Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      transition: filter 0.3s ease;
+    }
+    .blur {
+      filter: blur(4px);
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      line-height: 1.6;
+    }
+    #game-over {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      text-align: center;
+      display: none;
+      z-index: 10;
+    }
+    #game-message {
+      font-size: 16px;
+      margin-top: 12px;
+      color: #ccc;
+    }
+    #play-again-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+      background-color: #444;
+      border: none;
+      color: white;
+      border-radius: 8px;
+    }
+    #play-again-btn:hover {
+      background-color: #666;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="score">
+    High Score: <span id="high-score">0</span><br>
+    Score: <span id="current-score">0</span>
+  </div>
+  <div id="game-over">
+    <div>Game Over</div>
+    <div id="final-score"></div>
+    <div id="game-message"></div>
+    <button id="play-again-btn">Play Again</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const highScoreDisplay = document.getElementById('high-score');
+    const currentScoreDisplay = document.getElementById('current-score');
+    const gameOverScreen = document.getElementById('game-over');
+    const finalScoreDisplay = document.getElementById('final-score');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    const gameMessage = document.getElementById('game-message');
+
+    const starMessages = [
+      "Sorry, a star escaped",
+      "Practice makes perfect",
+      "Star said it does not want to be in ugly bucket",
+      "That was good effort, surely you can do better",
+      "created by the Mahesh Oli",
+      ...(Math.random() < 0.3 ? ["Stars fall out from the screen"] : [])
+    ];
+
+    const meteorMessages = [
+      "THAT was NOT a star",
+      "Maybe look while playing?",
+      "Is your eyes okay cause that was not A star",
+      "Mistakes happen, careful next time",
+      "Star and meteor does not goes together",
+      "created by the Mahesh Oli"
+    ];
+
+    let bucket = { x: 200, y: 560, width: 80, height: 40 };
+    let objects = [];
+    let score = 0;
+    let highScore = 0;
+    let gameOver = false;
+    let starCount = 0;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      bucket.y = canvas.height - 60;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function resetGame() {
+      score = 0;
+      starCount = 0;
+      objects = [];
+      gameOver = false;
+      canvas.classList.remove('blur');
+      gameOverScreen.style.display = 'none';
+      currentScoreDisplay.textContent = score;
+      gameMessage.textContent = '';
+      spawnObject('star');
+      loop();
+    }
+
+    function drawBucket() {
+      ctx.fillStyle = '#aaa';
+      ctx.beginPath();
+      ctx.moveTo(bucket.x, bucket.y);
+      ctx.lineTo(bucket.x + bucket.width * 0.1, bucket.y + bucket.height);
+      ctx.lineTo(bucket.x + bucket.width * 0.9, bucket.y + bucket.height);
+      ctx.lineTo(bucket.x + bucket.width, bucket.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawStar(x, y, r, spikes, angle) {
+      let rot = Math.PI / 2 * 3 + angle;
+      let step = Math.PI / spikes;
+      let outerRadius = r;
+      let innerRadius = r / 2;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(rot) * outerRadius, y + Math.sin(rot) * outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        let x1 = x + Math.cos(rot) * outerRadius;
+        let y1 = y + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x1, y1);
+        rot += step;
+
+        x1 = x + Math.cos(rot) * innerRadius;
+        y1 = y + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x1, y1);
+        rot += step;
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'gold';
+      ctx.fill();
+    }
+
+    function drawMeteor(x, y, size) {
+      ctx.fillStyle = '#8B4513';
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        let angle = (Math.PI * 2 / 6) * i;
+        let offsetX = Math.cos(angle) * size / 2 * (0.8 + Math.random() * 0.4);
+        let offsetY = Math.sin(angle) * size / 2 * (0.8 + Math.random() * 0.4);
+        if (i === 0) ctx.moveTo(x + offsetX, y + offsetY);
+        else ctx.lineTo(x + offsetX, y + offsetY);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function detectCollision(obj) {
+      return (
+        obj.y + obj.size >= bucket.y &&
+        obj.x + obj.size >= bucket.x &&
+        obj.x <= bucket.x + bucket.width
+      );
+    }
+
+    function spawnObject(type) {
+      const speed = 2 + score * 0.2;
+      const newObj = {
+        x: Math.random() * (canvas.width - 30),
+        y: 0,
+        size: 30,
+        speed: speed,
+        type: type,
+        active: true,
+        angle: 0,
+        rotationSpeed: (Math.random() - 0.5) * 0.1
+      };
+      objects.push(newObj);
+    }
+
+    function loop() {
+      if (gameOver) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBucket();
+
+      objects.forEach(obj => {
+        obj.y += obj.speed;
+        if (obj.type === 'star') obj.angle += obj.rotationSpeed;
+        if (!obj.active) return;
+
+        if (obj.type === 'star') {
+          drawStar(obj.x + obj.size / 2, obj.y + obj.size / 2, obj.size / 2, 5, obj.angle);
+        } else {
+          drawMeteor(obj.x + obj.size / 2, obj.y + obj.size / 2, obj.size);
+        }
+
+        if (detectCollision(obj)) {
+          if (obj.active) {
+            obj.active = false;
+            if (obj.type === 'meteor') {
+              endGame('meteor');
+            } else {
+              score++;
+              starCount++;
+              currentScoreDisplay.textContent = score;
+              if (score > highScore) {
+                highScore = score;
+                highScoreDisplay.textContent = highScore;
+              }
+            }
+          }
+        } if (obj.y > canvas.height && obj.active) {
+  obj.active = false;
+  if (obj.type === 'star') {
+    endGame('star');
+  }
+  // Do nothing if it's a meteor that just fell off screen
+}
+
+      });
+
+      objects = objects.filter(o => o.active);
+
+      if (!objects.some(o => o.type === 'star')) {
+        spawnObject('star');
+      }
+
+      if (objects.filter(o => o.type === 'star' && o.y > canvas.height / 2).length === 1 && objects.length === 1) {
+        spawnObject('star');
+      }
+
+      if (starCount > 0 && starCount % 8 === 0 && !objects.some(o => o.type === 'meteor')) {
+        spawnObject('meteor');
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    function endGame(type) {
+      gameOver = true;
+      canvas.classList.add('blur');
+      finalScoreDisplay.textContent = `Score: ${score}`;
+      const msgPool = type === 'meteor' ? meteorMessages : starMessages;
+      gameMessage.textContent = msgPool.sort(() => 0.5 - Math.random())[0];
+      gameOverScreen.style.display = 'block';
+    }
+
+    document.addEventListener('mousemove', e => {
+      bucket.x = e.clientX - bucket.width / 2;
+    });
+
+    playAgainBtn.addEventListener('click', resetGame);
+
+    resetGame();
+    document.addEventListener('touchmove', e => {
+  if (e.touches.length > 0) {
+    bucket.x = e.touches[0].clientX - bucket.width / 2;
+  }
+}, { passive: true });
+
+  </script>
+<div style="position: absolute; bottom: 5px; left: 10px; font-size: 12px; color: #777;">created by mahesholi027@gmail.com</div>
+</body>
+</html>

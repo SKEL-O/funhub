@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic-Tac-Toe</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #222;
+      color: #fff;
+      overflow: hidden;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    .scoreboard {
+      display: flex;
+      gap: 30px;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: #444;
+    }
+    .scoreboard div:first-child {
+      background-color: rgba(255, 0, 0, 0.2);
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+    .scoreboard div:last-child {
+      background-color: rgba(0, 191, 255, 0.2);
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+    .status {
+      margin: 10px 0;
+      font-size: 1.4rem;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 5px;
+    }
+    .cell {
+      background: #333;
+      border: 2px solid #555;
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.3s;
+    }
+    .cell:hover {
+      transform: scale(1.05);
+    }
+    .cell.X {
+      color: red;
+    }
+    .cell.O {
+      color: skyblue;
+    }
+    .highlight-x {
+      background-color: rgba(255, 0, 0, 0.2) !important;
+    }
+    .highlight-o {
+      background-color: rgba(0, 191, 255, 0.2) !important;
+    }
+    .winner {
+      background-color: #4caf50 !important;
+      animation: celebrate 0.5s infinite alternate;
+    }
+    #play-again {
+      display: none;
+      margin-top: 15px;
+      padding: 12px 24px;
+      font-size: 1.1rem;
+      background: #555;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    #play-again:hover {
+      background: #777;
+    }
+    @keyframes celebrate {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); background-color: #6f6; }
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: red;
+      animation: fall 1s linear infinite;
+      opacity: 0.8;
+    }
+    @keyframes fall {
+      0% { transform: translateY(-100px) rotate(0deg); }
+      100% { transform: translateY(100vh) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tic-Tac-Toe</h1>
+  <div class="status" id="status"></div>
+  <div class="board" id="board"></div>
+  <div class="status" id="status-bottom"></div>
+  <div class="scoreboard">
+    <div>X Score: <span id="x-score">0</span></div>
+    <div>O Score: <span id="o-score">0</span></div>
+  </div>
+  <button id="play-again" onclick="resetGame()">Play Again</button>
+
+  <script>
+    const board = document.getElementById('board');
+    const statusTop = document.getElementById('status');
+    const statusBottom = document.getElementById('status-bottom');
+    const xScoreSpan = document.getElementById('x-score');
+    const oScoreSpan = document.getElementById('o-score');
+    const playAgainBtn = document.getElementById('play-again');
+
+    let currentPlayer = 'X';
+    let gameActive = true;
+    let cells = [];
+    let xScore = 0;
+    let oScore = 0;
+
+    const winningCombos = [
+      [0,1,2], [3,4,5], [6,7,8],
+      [0,3,6], [1,4,7], [2,5,8],
+      [0,4,8], [2,4,6]
+    ];
+
+    function initGame() {
+      board.innerHTML = '';
+      cells = [];
+      gameActive = true;
+      currentPlayer = 'X';
+      updateStatus();
+      playAgainBtn.style.display = 'none';
+      document.querySelectorAll('.confetti').forEach(el => el.remove());
+
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.index = i;
+        cell.addEventListener('click', handleClick);
+        board.appendChild(cell);
+        cells.push(cell);
+      }
+      updateHoverHighlight();
+    }
+
+    function updateStatus() {
+      statusTop.textContent = `Player ${currentPlayer}'s turn`;
+      statusBottom.textContent = '';
+    }
+
+    function handleClick(e) {
+      const cell = e.target;
+      const index = +cell.dataset.index;
+      if (!gameActive || cell.textContent !== '') return;
+      cell.textContent = currentPlayer;
+      cell.classList.add(currentPlayer);
+
+      if (checkWin()) {
+        statusTop.textContent = `Player ${currentPlayer} wins! 🎉`;
+        statusBottom.textContent = '';
+        gameActive = false;
+        playAgainBtn.style.display = 'inline-block';
+        if (currentPlayer === 'X') xScore++; else oScore++;
+        updateScores();
+        launchConfetti();
+        return;
+      }
+
+      if (cells.every(c => c.textContent !== '')) {
+        statusTop.textContent = "It's a draw!";
+        statusBottom.textContent = '';
+        gameActive = false;
+        playAgainBtn.style.display = 'inline-block';
+        return;
+      }
+
+      currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+      updateStatus();
+      updateHoverHighlight();
+    }
+
+    function updateHoverHighlight() {
+      cells.forEach(cell => {
+        cell.classList.remove('highlight-x', 'highlight-o');
+        if (cell.textContent === '') {
+          cell.classList.add(currentPlayer === 'X' ? 'highlight-x' : 'highlight-o');
+        }
+      });
+    }
+
+    function checkWin() {
+      return winningCombos.some(combo => {
+        const [a, b, c] = combo;
+        if (
+          cells[a].textContent === currentPlayer &&
+          cells[b].textContent === currentPlayer &&
+          cells[c].textContent === currentPlayer
+        ) {
+          cells[a].classList.add('winner');
+          cells[b].classList.add('winner');
+          cells[c].classList.add('winner');
+          return true;
+        }
+        return false;
+      });
+    }
+
+    function updateScores() {
+      xScoreSpan.textContent = xScore;
+      oScoreSpan.textContent = oScore;
+    }
+
+    function resetGame() {
+      initGame();
+    }
+
+    function launchConfetti() {
+      for (let i = 0; i < 100; i++) {
+        const confetti = document.createElement('div');
+        confetti.classList.add('confetti');
+        confetti.style.left = Math.random() * window.innerWidth + 'px';
+        confetti.style.top = '-20px';
+        confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
+        document.body.appendChild(confetti);
+        setTimeout(() => confetti.remove(), 3000);
+      }
+    }
+
+    initGame();
+  </script>
+  <div style="position: absolute; bottom: 5px; left: 10px; font-size: 12px; color: #777;">created by mahesholi027@gmail.com</div>
+</body>
+</html>
